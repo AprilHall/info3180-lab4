@@ -6,8 +6,14 @@ This file creates your application.
 """
 import os
 from app import app
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from flask import render_template, request, redirect, url_for, flash, session, send_from_directory, abort
 from werkzeug.utils import secure_filename
+from forms import UploadForm
+rootdir = os.getcwd()
+print rootdir
+
+
+
 
 
 ###
@@ -28,19 +34,31 @@ def about():
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
+    error = None
     if not session.get('logged_in'):
         abort(401)
-
-    # Instantiate your form class
-
+    form = UploadForm()
     # Validate file upload on submit
     if request.method == 'POST':
-        # Get file data and save to your uploads folder
+        if form.validate() == False:
+            flash_errors(form)
+        else:
+            file = form.upload.data
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            flash('File Saved', 'success')
+            return redirect(url_for('home', error=error))
+    return render_template('upload.html', form = form, error=error)
 
-        flash('File Saved', 'success')
-        return redirect(url_for('home'))
+@app.route('/app/static/uploads')
+def send_image(filename):
+    return send_from_directory('/app/static/uploads', filename)
 
-    return render_template('upload.html')
+@app.route('/files')
+def files():
+    image_names = os.listdir('./app/static/uploads')
+    return render_template("files.html", image_names=image_names)
+    
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -72,7 +90,7 @@ def logout():
 def flash_errors(form):
     for field, errors in form.errors.items():
         for error in errors:
-            flash(u"Error in the %s field - %s" % (
+            flash(u"Error in the %s - %s" % (
                 getattr(form, field).label.text,
                 error
 ), 'danger')
